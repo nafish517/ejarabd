@@ -1,0 +1,43 @@
+# Environment variables & secrets
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+*.key
+*.bak
+*.backup
+*.db.backup
+*backup*
+api key/
+api key
+gemini api
+*gemini*.txt
+gemini paid api.txt
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+backend/venv/
+venv/
+**/venv/
+.pytest_cache/
+
+# Node & Build Outputs
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
