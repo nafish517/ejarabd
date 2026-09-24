@@ -11,42 +11,11 @@ if sys.stdout.encoding != 'utf-8':
         pass
 
 def load_gemini_api_key() -> str:
-    # 1. Check environment variable
+    """Load Gemini API key exclusively from the GEMINI_API_KEY environment variable."""
     env_key = os.getenv("GEMINI_API_KEY")
     if env_key and len(env_key.strip()) > 10:
         return env_key.strip().strip("'").strip('"')
-
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-    # 2. Check gemini paid api.txt in root
-    paid_path = os.path.join(base_dir, "gemini paid api.txt")
-    if os.path.exists(paid_path):
-        with open(paid_path, "r", encoding="utf-8") as f:
-            for line in f:
-                l = line.strip()
-                if l and not l.startswith("curl") and not l.startswith("-") and not l.startswith("{"):
-                    return l.strip().strip("'").strip('"')
-
-    # 3. Check api key folder
-    key_path = os.path.join(base_dir, "api key", "gemini api")
-    if not os.path.exists(key_path):
-        key_path = r"C:\Users\User\Desktop\ai access folder\ejarabd\api key\gemini api"
-    if not os.path.exists(key_path):
-        key_path = r"C:\Users\User\Desktop\ai access folder\Tenderwise\api key\gemini api"
-    if not os.path.exists(key_path):
-        raise FileNotFoundError(f"API key file not found at: {key_path}")
-    with open(key_path, "r", encoding="utf-8") as f:
-        content = f.read().strip()
-    # Check if there is a prefix like "key:" or "key="
-    if ":" in content and not content.startswith("http"):
-        parts = content.split(":", 1)
-        if len(parts[0]) < 20:
-            content = parts[1].strip()
-    elif "=" in content:
-        parts = content.split("=", 1)
-        if len(parts[0]) < 20:
-            content = parts[1].strip()
-    return content.strip().strip("'").strip('"')
+    raise ValueError("GEMINI_API_KEY environment variable is not set or invalid.")
 
 
 def main():
