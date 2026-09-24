@@ -1,4 +1,4 @@
-import type { Client, ClientMatchesResponse, HealthStatus } from '../types';
+import type { Client, ClientMatchesResponse, HealthStatus, TendersListResponse } from '../types';
 
 const API_BASE = '/api';
 
@@ -72,7 +72,18 @@ export const api = {
     return request<ClientMatchesResponse>(`/clients/${clientId}/matches${qs}`);
   },
 
-  sendTestEmail: (clientId: number, recipientEmail?: string, tenderId?: number) =>
+  getTenders: (params?: { search?: string; district?: string; category?: string; limit?: number; offset?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.search) q.append('search', params.search);
+    if (params?.district) q.append('district', params.district);
+    if (params?.category) q.append('category', params.category);
+    if (params?.limit) q.append('limit', String(params.limit));
+    if (params?.offset) q.append('offset', String(params.offset));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return request<TendersListResponse>(`/tenders${qs}`);
+  },
+
+  sendTestEmail: (clientId: number, recipientEmail?: string, tenderId?: number, force: boolean = false) =>
     request<{
       status: string;
       message: string;
@@ -84,6 +95,7 @@ export const api = {
       body: JSON.stringify({
         recipient_email: recipientEmail,
         tender_id: tenderId,
+        force,
       }),
     }),
 };

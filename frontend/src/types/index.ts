@@ -78,3 +78,26 @@ export interface HealthStatus {
   email_dev_mode: boolean;
   smtp_configured: boolean;
 }
+
+export interface StoredTender {
+  id: number;
+  tender_id: string;
+  title: string;
+  agency: string;
+  office?: string | null;
+  district: string;
+  location_details?: string | null;
+  category: string;
+  estimated_value_bdt?: number | null;
+  tender_security_bdt?: number | null;
+  closing_date?: string | null;
+  source_url: string;
+}
+
+export interface TendersListResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  items: StoredTender[];
+}
+

@@ -140,6 +140,7 @@ class ClientStatusUpdate(BaseModel):
 class TestEmailRequest(BaseModel):
     recipient_email: Optional[str] = None
     tender_id: Optional[int] = None
+    force: Optional[bool] = False
 
 
 # ==============================================================================
@@ -553,23 +554,56 @@ def send_test_email_for_client(
             ).first()
 
     if not tender:
-        # Find best fit match
-        best_match = db.query(MatchAssessment, Tender).join(
+        # Prevent duplicate: find best fit match that has not been sent yet
+        sent_tender_ids = [
+            r[0] for r in db.query(EmailNotificationRecord.tender_id).filter(
+                EmailNotificationRecord.contractor_id == client.id,
+                EmailNotificationRecord.status == "sent"
+            ).all() if r[0]
+        ]
+
+        query = db.query(MatchAssessment, Tender).join(
             Tender, MatchAssessment.tender_id == Tender.id
         ).filter(
             MatchAssessment.contractor_id == client.id,
-            MatchAssessment.preference_fit_status == "fits"
-        ).first()
+            MatchAssessment.preference_fit_status == "fits",
+            Tender.status == "active"
+        )
+        if sent_tender_ids:
+            query = query.filter(~Tender.id.in_(sent_tender_ids))
+
+        best_match = query.first()
 
         if best_match:
             assessment, tender = best_match
         else:
-            # Fallback to any recent active tender
-            tender = db.query(Tender).filter_by(status="active").first()
-            if tender:
-                assessment = db.query(MatchAssessment).filter_by(
-                    contractor_id=client.id, tender_id=tender.id
+            # Fallback to any active match that hasn't been sent
+            fallback_query = db.query(MatchAssessment, Tender).join(
+                Tender, MatchAssessment.tender_id == Tender.id
+            ).filter(
+                MatchAssessment.contractor_id == client.id,
+                Tender.status == "active"
+            )
+            if sent_tender_ids:
+                fallback_query = fallback_query.filter(~Tender.id.in_(sent_tender_ids))
+            fallback_match = fallback_query.first()
+            if fallback_match:
+                assessment, tender = fallback_match
+            else:
+                # If all matches have been sent, fallback to any active tender
+                fallback_any = db.query(MatchAssessment, Tender).join(
+                    Tender, MatchAssessment.tender_id == Tender.id
+                ).filter(
+                    MatchAssessment.contractor_id == client.id
                 ).first()
+                if fallback_any:
+                    assessment, tender = fallback_any
+                else:
+                    tender = db.query(Tender).filter_by(status="active").first()
+                    if tender:
+                        assessment = db.query(MatchAssessment).filter_by(
+                            contractor_id=client.id, tender_id=tender.id
+                        ).first()
 
     if not tender:
         raise HTTPException(status_code=404, detail="পরীক্ষার জন্য কোনো টেন্ডার ডাটাবেজে পাওয়া যায়নি")
@@ -592,6 +626,28 @@ def send_test_email_for_client(
     target_recipient = target_recipient.strip()
     if not target_recipient:
         raise HTTPException(status_code=400, detail="ক্লায়েন্টের কোনো ইমেইল ঠিকানা নেই এবং কোনো টেস্ট ইমেইল প্রদান করা হয়নি")
+
+    # Prevent duplicate client+tender notifications unless explicitly forced or developer test dispatch
+    is_developer_test = bool(payload and payload.recipient_email and payload.recipient_email != client.email)
+    force_send = bool(payload and payload.force) or is_developer_test
+    existing_record = db.query(EmailNotificationRecord).filter(
+        EmailNotificationRecord.contractor_id == client.id,
+        EmailNotificationRecord.tender_id == tender.id,
+        EmailNotificationRecord.status == "sent"
+    ).first()
+
+    if existing_record and not force_send:
+        sent_date_str = existing_record.sent_at.strftime("%d-%m-%Y") if existing_record.sent_at else "ইতিপূর্বে"
+        return {
+            "status": "already_sent",
+            "message": f"এই দরপত্রের (#{tender.tender_id}) নোটিফিকেশন ইতোমধ্যেই {sent_date_str} তারিখে পাঠানো হয়েছে (ডুপ্লিকেট প্রতিরোধ সক্রিয়)।",
+            "recipient": existing_record.recipient_email,
+            "provider": existing_record.provider,
+            "tender_title": tender.title,
+            "tender_id": tender.tender_id,
+            "record_id": existing_record.id,
+            "duplicate_prevented": True
+        }
 
     # Render email content
     subject, html_body, text_body = render_tender_notification_email(
